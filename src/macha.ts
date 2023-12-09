@@ -1,103 +1,61 @@
+import axios from "axios"; 
+import {MongoClient} from "mongodb"; 
 import {
-  Approval as ApprovalEvent,
-  ApprovalForAll as ApprovalForAllEvent,
-  BatchMetadataUpdate as BatchMetadataUpdateEvent,
-  MetadataUpdate as MetadataUpdateEvent,
-  Transfer as TransferEvent,
   nftMinted as nftMintedEvent
 } from "../generated/Macha/Macha"
 import {
-  Approval,
-  ApprovalForAll,
-  BatchMetadataUpdate,
-  MetadataUpdate,
-  Transfer,
   nftMinted
 } from "../generated/schema"
 
-export function handleApproval(event: ApprovalEvent): void {
-  let entity = new Approval(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.owner = event.params.owner
-  entity.approved = event.params.approved
-  entity.tokenId = event.params.tokenId
+const mongoUri = 'mongodb+srv://doshivarun202:KZajssIpBskVfU4M@cluster0.fors5eb.mongodb.net/'; 
+const mongoClient = new MongoClient(mongoUri); 
 
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-
-  entity.save()
-}
-
-export function handleApprovalForAll(event: ApprovalForAllEvent): void {
-  let entity = new ApprovalForAll(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.owner = event.params.owner
-  entity.operator = event.params.operator
-  entity.approved = event.params.approved
-
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-
-  entity.save()
-}
-
-export function handleBatchMetadataUpdate(
-  event: BatchMetadataUpdateEvent
-): void {
-  let entity = new BatchMetadataUpdate(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity._fromTokenId = event.params._fromTokenId
-  entity._toTokenId = event.params._toTokenId
-
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-
-  entity.save()
-}
-
-export function handleMetadataUpdate(event: MetadataUpdateEvent): void {
-  let entity = new MetadataUpdate(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity._tokenId = event.params._tokenId
-
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-
-  entity.save()
-}
-
-export function handleTransfer(event: TransferEvent): void {
-  let entity = new Transfer(
-    event.transaction.hash.concatI32(event.logIndex.toI32())
-  )
-  entity.from = event.params.from
-  entity.to = event.params.to
-  entity.tokenId = event.params.tokenId
-
-  entity.blockNumber = event.block.number
-  entity.blockTimestamp = event.block.timestamp
-  entity.transactionHash = event.transaction.hash
-
-  entity.save()
-}
-
-export function handlenftMinted(event: nftMintedEvent): void {
+export async function handlenftMinted(event: nftMintedEvent): void {
   let entity = new nftMinted(
     event.transaction.hash.concatI32(event.logIndex.toI32())
   )
-  entity.uri = event.params.uri
-
+  entity.uri = event.params.uri.toString()
+  try { 
+    const metadata = await getMetadataUrl(event.params.uri.toString()); 
+    await saveDocumentToMongoDB(metadata, 'metadata'); 
+  } catch (error) { 
+    console.error(error); 
+    throw new Error('Failed to process metadata'); 
+  } 
   entity.blockNumber = event.block.number
   entity.blockTimestamp = event.block.timestamp
   entity.transactionHash = event.transaction.hash
 
   entity.save()
 }
+
+async function getMetadataUrl(metadataUri: string): void { 
+  let metadataUrl: string | undefined; 
+ 
+  if (metadataUri.startsWith("ipfs://")) { 
+    metadataUrl = `https://ipfs.io/ipfs/${metadataUri.split("ipfs://")[1]}`; 
+  } else if (metadataUri.startsWith("https://")) { 
+    metadataUrl = metadataUri; 
+  } 
+ 
+  if (!metadataUrl) { 
+    throw new Error('Invalid metadata URL'); 
+  } 
+ 
+  const metadata = await axios.get(metadataUrl as string); 
+  return metadata; 
+} 
+
+async function saveDocumentToMongoDB(jsonDocument: any, collectionName: string): void { 
+  try { 
+    await mongoClient.connect(); 
+    console.log('Connected to MongoDB'); 
+    const database = mongoClient.db('denfo'); 
+    const collection = database.collection(collectionName); 
+    const result = await collection.insertOne(jsonDocument); 
+    console.log(`Document inserted with _id: ${result.insertedId}`); 
+  } finally { 
+    await mongoClient.close(); 
+    console.log('Connection to MongoDB closed'); 
+  } 
+} 
