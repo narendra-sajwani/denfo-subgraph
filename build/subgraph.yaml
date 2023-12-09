@@ -1,0 +1,24 @@
+specVersion: 0.0.5
+schema:
+  file: schema.graphql
+dataSources:
+  - kind: ethereum
+    name: Macha
+    network: arbitrum-sepolia
+    source:
+      address: "0xd9276777548d4b1e7b35b87d1ED9F8bA6FFcBfC6"
+      abi: Macha
+      startBlock: 2429707
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - nftMinted
+      abis:
+        - name: Macha
+          file: Macha/abis/Macha.json
+      eventHandlers:
+        - event: nftMinted(indexed string)
+          handler: handlenftMinted
+      file: Macha/Macha.wasm

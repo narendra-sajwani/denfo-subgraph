@@ -1,0 +1,7 @@
+type nftMinted @entity(immutable: true) {
+  id: Bytes!
+  uri: String! # string
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
